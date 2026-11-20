@@ -1,0 +1,1774 @@
+<!DOCTYPE html>
+<html lang="pt-BR" class="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>FinanControl — Controle Financeiro & Google Sheets</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Chart.js -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <!-- Lucide Icons -->
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <!-- Google Fonts: Inter -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    fontFamily: {
+                        sans: ['Inter', 'sans-serif'],
+                    },
+                    colors: {
+                        brand: {
+                            50: '#eef2ff',
+                            100: '#e0e7ff',
+                            500: '#6366f1',
+                            600: '#4f46e5',
+                            700: '#4338ca',
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+</head>
+<body class="bg-slate-50 text-slate-900 dark:bg-slate-950 dark:text-slate-100 font-sans antialiased transition-colors duration-200 min-h-screen flex flex-col">
+
+    <!-- Toast / Notificações Flutuantes -->
+    <div id="toast-container" class="fixed bottom-5 right-5 z-50 flex flex-col gap-2 pointer-events-none"></div>
+
+    <!-- Barra Superior (Navbar) -->
+    <header class="sticky top-0 z-40 bg-white/80 dark:bg-slate-900/80 backdrop-blur-md border-b border-slate-200 dark:border-slate-800">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between gap-4">
+            <!-- Logo e Título -->
+            <div class="flex items-center gap-3">
+                <div class="w-10 h-10 rounded-xl bg-gradient-to-tr from-indigo-600 to-violet-500 flex items-center justify-center text-white shadow-lg shadow-indigo-500/25">
+                    <i data-lucide="wallet" class="w-5 h-5"></i>
+                </div>
+                <div>
+                    <h1 class="font-bold text-lg tracking-tight leading-none">FinanControl</h1>
+                    <span class="text-xs text-slate-500 dark:text-slate-400">Gestão Inteligente</span>
+                </div>
+            </div>
+
+            <!-- Navegação Principal (Abas) -->
+            <nav class="hidden md:flex items-center gap-1 bg-slate-100 dark:bg-slate-800/80 p-1 rounded-xl border border-slate-200/60 dark:border-slate-700/60">
+                <button onclick="switchTab('dashboard')" id="nav-dashboard" class="nav-btn px-4 py-1.5 rounded-lg text-sm font-medium transition-all flex items-center gap-2 bg-white dark:bg-slate-900 text-indigo-600 dark:text-indigo-400 shadow-sm">
+                    <i data-lucide="layout-dashboard" class="w-4 h-4"></i>
+                    Dashboard & Lançamentos
+                </button>
+                <button onclick="switchTab('sheets')" id="nav-sheets" class="nav-btn px-4 py-1.5 rounded-lg text-sm font-medium text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white transition-all flex items-center gap-2">
+                    <i data-lucide="table-2" class="w-4 h-4"></i>
+                    Configurar Google Sheets
+                </button>
+            </nav>
+
+            <!-- Status de Sincronização e Ações Rápidas -->
+            <div class="flex items-center gap-2 sm:gap-3">
+                <!-- Indicador Google Sheets -->
+                <button onclick="switchTab('sheets')" id="sync-badge" class="flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-medium bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/20 hover:bg-amber-500/20 transition-colors" title="Clique para configurar sincronização com Google Drive">
+                    <span id="sync-dot" class="w-2 h-2 rounded-full bg-amber-500 animate-pulse"></span>
+                    <span id="sync-label" class="hidden sm:inline">Modo Local</span>
+                </button>
+
+                <!-- Botão Sincronizar Agora (aparece quando configurado) -->
+                <button id="btn-sync-now" onclick="syncWithGoogleSheets('pull')" class="hidden p-2 rounded-xl bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 hover:bg-emerald-500/20 border border-emerald-500/20 transition-all" title="Sincronizar com Google Planilhas agora">
+                    <i data-lucide="refresh-cw" id="sync-icon" class="w-4 h-4"></i>
+                </button>
+
+                <!-- Alternar Tema Claro/Escuro -->
+                <button onclick="toggleTheme()" class="p-2 rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors" aria-label="Alternar tema">
+                    <i data-lucide="sun" class="w-4 h-4 hidden dark:block"></i>
+                    <i data-lucide="moon" class="w-4 h-4 block dark:hidden"></i>
+                </button>
+
+                <!-- Botão Novo Lançamento Mobile/Desktop -->
+                <button onclick="openModal()" class="flex items-center gap-2 px-3.5 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-semibold shadow-md shadow-indigo-600/20 transition-all active:scale-95">
+                    <i data-lucide="plus" class="w-4 h-4"></i>
+                    <span class="hidden sm:inline">Novo Lançamento</span>
+                </button>
+            </div>
+        </div>
+
+        <!-- Navegação Mobile -->
+        <div class="flex md:hidden border-t border-slate-200 dark:border-slate-800 px-4 py-2 gap-2 bg-slate-50/90 dark:bg-slate-900/90">
+            <button onclick="switchTab('dashboard')" id="nav-dashboard-mob" class="flex-1 py-1.5 rounded-lg text-xs font-semibold text-center bg-indigo-600 text-white">
+                Dashboard & Contas
+            </button>
+            <button onclick="switchTab('sheets')" id="nav-sheets-mob" class="flex-1 py-1.5 rounded-lg text-xs font-semibold text-center bg-slate-200 dark:bg-slate-800 text-slate-700 dark:text-slate-300">
+                Google Sheets (Drive)
+            </button>
+        </div>
+    </header>
+
+    <!-- Conteúdo Principal -->
+    <main class="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-6">
+
+        <!-- ========================================================= -->
+        <!-- ABA 1: DASHBOARD & LANÇAMENTOS                            -->
+        <!-- ========================================================= -->
+        <div id="tab-dashboard" class="space-y-6">
+
+            <!-- Barra de Filtro de Período e Resumo Rápido -->
+            <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-white dark:bg-slate-900 p-4 rounded-2xl border border-slate-200/80 dark:border-slate-800 shadow-sm">
+                <div class="flex items-center gap-3">
+                    <div class="p-2.5 rounded-xl bg-indigo-500/10 text-indigo-600 dark:text-indigo-400">
+                        <i data-lucide="calendar" class="w-5 h-5"></i>
+                    </div>
+                    <div>
+                        <h2 class="text-sm font-semibold text-slate-800 dark:text-slate-200">Período de Análise</h2>
+                        <p class="text-xs text-slate-500 dark:text-slate-400">Filtre os indicadores e lançamentos pelo mês</p>
+                    </div>
+                </div>
+
+                <div class="flex flex-wrap items-center gap-2">
+                    <select id="filter-month" onchange="renderAll()" class="px-3 py-2 rounded-xl bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-sm font-medium focus:outline-none focus:ring-2 focus:ring-indigo-500">
+                        <option value="ALL">Todos os Meses</option>
+                        <option value="01">Janeiro</option>
+                        <option value="02">Fevereiro</option>
+                        <option value="03">Março</option>
+                        <option value="04">Abril</option>
+                        <option value="05">Maio</option>
+                        <option value="06">Junho</option>
+                        <option value="07">Julho</option>
+                        <option value="08">Agosto</option>
+                        <option value="09">Setembro</option>
+                        <option value="10">Outubro</option>
+                        <option value="11">Novembro</option>
+                        <option value="12">Dezembro</option>
+                    </select>
+
+                    <select id="filter-year" onchange="renderAll()" class="px-3 py-2 rounded-xl bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-sm font-medium focus:outline-none focus:ring-2 focus:ring-indigo-500">
+                        <option value="ALL">Todos os Anos</option>
+                    </select>
+                </div>
+            </div>
+
+            <!-- Cards de KPIs (6 Indicadores Principais) -->
+            <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-4">
+                <!-- KPI 1: Saldo Atual (Realizado / Descontando Contas Pagas) -->
+                <div class="bg-white dark:bg-slate-900 p-4 rounded-2xl border border-slate-200/80 dark:border-slate-800 shadow-sm flex flex-col justify-between">
+                    <div class="flex items-center justify-between mb-2">
+                        <span class="text-xs font-medium text-slate-500 dark:text-slate-400">Saldo em Conta</span>
+                        <div class="w-8 h-8 rounded-lg bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 flex items-center justify-center">
+                            <i data-lucide="scale" class="w-4 h-4"></i>
+                        </div>
+                    </div>
+                    <div>
+                        <div id="kpi-balance" class="text-xl font-bold tracking-tight">R$ 0,00</div>
+                        <p id="kpi-balance-sub" class="text-[11px] text-slate-500 mt-1">Pago descontado • Previsto: R$ 0,00</p>
+                    </div>
+                </div>
+
+                <!-- KPI 2: Total de Entradas -->
+                <div class="bg-white dark:bg-slate-900 p-4 rounded-2xl border border-slate-200/80 dark:border-slate-800 shadow-sm flex flex-col justify-between">
+                    <div class="flex items-center justify-between mb-2">
+                        <span class="text-xs font-medium text-slate-500 dark:text-slate-400">Total Entradas</span>
+                        <div class="w-8 h-8 rounded-lg bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 flex items-center justify-center">
+                            <i data-lucide="arrow-up-circle" class="w-4 h-4"></i>
+                        </div>
+                    </div>
+                    <div>
+                        <div id="kpi-income" class="text-xl font-bold text-emerald-600 dark:text-emerald-400 tracking-tight">R$ 0,00</div>
+                        <p id="kpi-income-count" class="text-[11px] text-slate-500 mt-1">0 receitas registradas</p>
+                    </div>
+                </div>
+
+                <!-- KPI 3: Total de Saídas -->
+                <div class="bg-white dark:bg-slate-900 p-4 rounded-2xl border border-slate-200/80 dark:border-slate-800 shadow-sm flex flex-col justify-between">
+                    <div class="flex items-center justify-between mb-2">
+                        <span class="text-xs font-medium text-slate-500 dark:text-slate-400">Total Saídas</span>
+                        <div class="w-8 h-8 rounded-lg bg-rose-500/10 text-rose-600 dark:text-rose-400 flex items-center justify-center">
+                            <i data-lucide="arrow-down-circle" class="w-4 h-4"></i>
+                        </div>
+                    </div>
+                    <div>
+                        <div id="kpi-expense" class="text-xl font-bold text-rose-600 dark:text-rose-400 tracking-tight">R$ 0,00</div>
+                        <p id="kpi-expense-count" class="text-[11px] text-slate-500 mt-1">Fixas + Outras dívidas</p>
+                    </div>
+                </div>
+
+                <!-- KPI 4: Dívidas Fixas -->
+                <div class="bg-white dark:bg-slate-900 p-4 rounded-2xl border border-slate-200/80 dark:border-slate-800 shadow-sm flex flex-col justify-between">
+                    <div class="flex items-center justify-between mb-2">
+                        <span class="text-xs font-medium text-slate-500 dark:text-slate-400">Dívidas Fixas</span>
+                        <div class="w-8 h-8 rounded-lg bg-violet-500/10 text-violet-600 dark:text-violet-400 flex items-center justify-center">
+                            <i data-lucide="anchor" class="w-4 h-4"></i>
+                        </div>
+                    </div>
+                    <div>
+                        <div id="kpi-fixed" class="text-xl font-bold text-violet-600 dark:text-violet-400 tracking-tight">R$ 0,00</div>
+                        <div class="flex items-center gap-1.5 mt-1">
+                            <span id="kpi-fixed-pct" class="text-[11px] font-semibold px-1.5 py-0.5 rounded bg-violet-500/10 text-violet-600 dark:text-violet-300">0% da renda</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- KPI 5: Outras Dívidas -->
+                <div class="bg-white dark:bg-slate-900 p-4 rounded-2xl border border-slate-200/80 dark:border-slate-800 shadow-sm flex flex-col justify-between">
+                    <div class="flex items-center justify-between mb-2">
+                        <span class="text-xs font-medium text-slate-500 dark:text-slate-400">Outras Dívidas</span>
+                        <div class="w-8 h-8 rounded-lg bg-amber-500/10 text-amber-600 dark:text-amber-400 flex items-center justify-center">
+                            <i data-lucide="shopping-bag" class="w-4 h-4"></i>
+                        </div>
+                    </div>
+                    <div>
+                        <div id="kpi-variable" class="text-xl font-bold text-amber-600 dark:text-amber-400 tracking-tight">R$ 0,00</div>
+                        <p id="kpi-variable-pct" class="text-[11px] text-slate-500 mt-1">0% da renda comprometida</p>
+                    </div>
+                </div>
+
+                <!-- KPI 6: Contas Pendentes -->
+                <div class="bg-white dark:bg-slate-900 p-4 rounded-2xl border border-slate-200/80 dark:border-slate-800 shadow-sm flex flex-col justify-between">
+                    <div class="flex items-center justify-between mb-2">
+                        <span class="text-xs font-medium text-slate-500 dark:text-slate-400">A Pagar (Pendente)</span>
+                        <div class="w-8 h-8 rounded-lg bg-orange-500/10 text-orange-600 dark:text-orange-400 flex items-center justify-center">
+                            <i data-lucide="clock" class="w-4 h-4"></i>
+                        </div>
+                    </div>
+                    <div>
+                        <div id="kpi-pending" class="text-xl font-bold text-orange-600 dark:text-orange-400 tracking-tight">R$ 0,00</div>
+                        <p id="kpi-pending-count" class="text-[11px] text-slate-500 mt-1">0 contas em aberto</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Seção de Dashboards (Gráficos Interativos) -->
+            <div class="grid grid-cols-1 lg:grid-cols-12 gap-6">
+                <!-- Gráfico 1: Rosca - Distribuição da Renda (Dívidas Fixas vs Outras Dívidas vs Saldo Livre) -->
+                <div class="lg:col-span-4 bg-white dark:bg-slate-900 p-5 rounded-2xl border border-slate-200/80 dark:border-slate-800 shadow-sm flex flex-col">
+                    <div class="mb-4">
+                        <h3 class="text-sm font-bold text-slate-800 dark:text-slate-100">Comprometimento da Renda</h3>
+                        <p class="text-xs text-slate-500 dark:text-slate-400">Dívidas Fixas vs. Outras Dívidas vs. Saldo Livre</p>
+                    </div>
+                    <div class="relative flex-1 min-h-[240px] flex items-center justify-center">
+                        <canvas id="chart-doughnut"></canvas>
+                    </div>
+                </div>
+
+                <!-- Gráfico 2: Barras - Evolução Mensal (Entradas vs Dívidas Fixas vs Outras Dívidas) -->
+                <div class="lg:col-span-5 bg-white dark:bg-slate-900 p-5 rounded-2xl border border-slate-200/80 dark:border-slate-800 shadow-sm flex flex-col">
+                    <div class="mb-4">
+                        <h3 class="text-sm font-bold text-slate-800 dark:text-slate-100">Fluxo Mensal (Entradas vs. Saídas)</h3>
+                        <p class="text-xs text-slate-500 dark:text-slate-400">Comparativo mensal empilhado por tipo de dívida</p>
+                    </div>
+                    <div class="relative flex-1 min-h-[240px]">
+                        <canvas id="chart-bar"></canvas>
+                    </div>
+                </div>
+
+                <!-- Gráfico 3: Barras Horizontais - Maiores Gastos por Categoria -->
+                <div class="lg:col-span-3 bg-white dark:bg-slate-900 p-5 rounded-2xl border border-slate-200/80 dark:border-slate-800 shadow-sm flex flex-col">
+                    <div class="mb-4">
+                        <h3 class="text-sm font-bold text-slate-800 dark:text-slate-100">Top Categorias de Gasto</h3>
+                        <p class="text-xs text-slate-500 dark:text-slate-400">Onde seu dinheiro está indo</p>
+                    </div>
+                    <div class="relative flex-1 min-h-[240px]">
+                        <canvas id="chart-categories"></canvas>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Tabela / Lista de Lançamentos com Filtros Avançados -->
+            <div class="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200/80 dark:border-slate-800 shadow-sm overflow-hidden">
+                <!-- Cabeçalho e Filtros da Tabela -->
+                <div class="p-5 border-b border-slate-200 dark:border-slate-800 space-y-4">
+                    <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                        <div>
+                            <h3 class="text-base font-bold text-slate-800 dark:text-slate-100">Histórico de Lançamentos</h3>
+                            <p class="text-xs text-slate-500 dark:text-slate-400">Gerencie suas entradas, dívidas fixas e outras despesas</p>
+                        </div>
+
+                        <div class="flex flex-wrap items-center gap-2">
+                            <button onclick="exportCSV()" class="px-3 py-1.5 rounded-xl bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-xs font-medium flex items-center gap-1.5 transition-colors">
+                                <i data-lucide="download" class="w-3.5 h-3.5"></i>
+                                Exportar CSV
+                            </button>
+                            <button onclick="openModal()" class="px-3.5 py-1.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-semibold flex items-center gap-1.5 transition-colors">
+                                <i data-lucide="plus" class="w-3.5 h-3.5"></i>
+                                Adicionar Conta
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Barra de Filtros -->
+                    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+                        <!-- Busca por texto -->
+                        <div class="relative">
+                            <i data-lucide="search" class="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2"></i>
+                            <input type="text" id="search-input" oninput="renderTable()" placeholder="Buscar descrição ou categoria..." class="w-full pl-9 pr-3 py-2 rounded-xl bg-slate-50 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500">
+                        </div>
+
+                        <!-- Filtro por Classificação -->
+                        <select id="filter-class" onchange="renderTable()" class="px-3 py-2 rounded-xl bg-slate-50 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500">
+                            <option value="ALL">Todas as Classificações</option>
+                            <option value="Entrada">🟢 Entradas (Receitas)</option>
+                            <option value="Dívida Fixa">🟣 Dívidas Fixas</option>
+                            <option value="Outra Dívida">🟠 Outras Dívidas / Variáveis</option>
+                        </select>
+
+                        <!-- Filtro por Status -->
+                        <select id="filter-status" onchange="renderTable()" class="px-3 py-2 rounded-xl bg-slate-50 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500">
+                            <option value="ALL">Todos os Status</option>
+                            <option value="Pago">✅ Pago / Recebido</option>
+                            <option value="Pendente">⏳ Pendente</option>
+                        </select>
+
+                        <!-- Ordenação -->
+                        <select id="filter-sort" onchange="renderTable()" class="px-3 py-2 rounded-xl bg-slate-50 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500">
+                            <option value="date-desc">Data (Mais recente)</option>
+                            <option value="date-asc">Data (Mais antiga)</option>
+                            <option value="amount-desc">Valor (Maior para menor)</option>
+                            <option value="amount-asc">Valor (Menor para maior)</option>
+                        </select>
+                    </div>
+                </div>
+
+                <!-- Tabela Responsiva -->
+                <div class="overflow-x-auto">
+                    <table class="w-full text-left border-collapse">
+                        <thead>
+                            <tr class="bg-slate-50/80 dark:bg-slate-800/50 border-b border-slate-200 dark:border-slate-800 text-[11px] uppercase tracking-wider text-slate-500 dark:text-slate-400 font-semibold">
+                                <th class="py-3.5 px-4">Data</th>
+                                <th class="py-3.5 px-4">Descrição</th>
+                                <th class="py-3.5 px-4">Classificação</th>
+                                <th class="py-3.5 px-4">Categoria</th>
+                                <th class="py-3.5 px-4">Status</th>
+                                <th class="py-3.5 px-4 text-right">Valor</th>
+                                <th class="py-3.5 px-4 text-center">Ações</th>
+                            </tr>
+                        </thead>
+                        <tbody id="transactions-tbody" class="divide-y divide-slate-200/70 dark:divide-slate-800 text-sm">
+                            <!-- Linhas geradas via JS -->
+                        </tbody>
+                    </table>
+                </div>
+
+                <!-- Estado Vazio -->
+                <div id="empty-state" class="hidden py-12 px-4 text-center">
+                    <div class="w-12 h-12 rounded-2xl bg-slate-100 dark:bg-slate-800 text-slate-400 flex items-center justify-center mx-auto mb-3">
+                        <i data-lucide="inbox" class="w-6 h-6"></i>
+                    </div>
+                    <h4 class="text-sm font-semibold text-slate-700 dark:text-slate-300">Nenhum lançamento encontrado</h4>
+                    <p class="text-xs text-slate-500 mt-1">Tente limpar os filtros ou adicione uma nova receita ou despesa.</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- ========================================================= -->
+        <!-- ABA 2: INTEGRAÇÃO COM GOOGLE PLANILHAS (GOOGLE DRIVE)     -->
+        <!-- ========================================================= -->
+        <div id="tab-sheets" class="hidden space-y-6">
+            <div class="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200/80 dark:border-slate-800 p-6 shadow-sm">
+                <div class="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-6 border-b border-slate-200 dark:border-slate-800">
+                    <div class="flex items-start gap-4">
+                        <div class="w-12 h-12 rounded-2xl bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 flex items-center justify-center shrink-0">
+                            <i data-lucide="file-spreadsheet" class="w-6 h-6"></i>
+                        </div>
+                        <div>
+                            <h2 class="text-lg font-bold text-slate-900 dark:text-white">Banco de Dados no Google Drive (Google Sheets)</h2>
+                            <p class="text-sm text-slate-500 dark:text-slate-400 mt-0.5">
+                                Conecte este app diretamente a uma Planilha Google privada no seu Google Drive sem precisar pagar servidores.
+                            </p>
+                        </div>
+                    </div>
+
+                    <div id="sheets-connection-pill" class="px-3.5 py-2 rounded-xl text-xs font-semibold bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/20 self-start">
+                        Status: Não Conectado (Salvando no Navegador)
+                    </div>
+                </div>
+
+                <!-- Passo a Passo + Formulário de Conexão -->
+                <div class="grid grid-cols-1 lg:grid-cols-12 gap-8 pt-6">
+                    <!-- Coluna Esquerda: Instruções e Código Apps Script -->
+                    <div class="lg:col-span-7 space-y-5">
+                        <h3 class="text-sm font-bold uppercase tracking-wider text-indigo-600 dark:text-indigo-400">Passo a Passo (Leva 2 minutos)</h3>
+
+                        <ol class="space-y-4 text-sm text-slate-600 dark:text-slate-300">
+                            <li class="flex gap-3">
+                                <span class="w-6 h-6 rounded-full bg-indigo-600 text-white text-xs font-bold flex items-center justify-center shrink-0 mt-0.5">1</span>
+                                <div>
+                                    <strong class="text-slate-900 dark:text-white">Crie uma Planilha Google no Drive:</strong>
+                                    Acesse <a href="https://sheets.new" target="_blank" class="text-indigo-600 dark:text-indigo-400 underline font-medium">sheets.new</a> e dê um nome (ex: <em>Controle Financeiro Pessoal</em>).
+                                </div>
+                            </li>
+                            <li class="flex gap-3">
+                                <span class="w-6 h-6 rounded-full bg-indigo-600 text-white text-xs font-bold flex items-center justify-center shrink-0 mt-0.5">2</span>
+                                <div>
+                                    <strong class="text-slate-900 dark:text-white">Abra o Apps Script:</strong>
+                                    Na planilha, clique no menu superior em <strong>Extensões &gt; Apps Script</strong>. Apague qualquer código que estiver lá e cole o código abaixo:
+                                </div>
+                            </li>
+                        </ol>
+
+                        <!-- Bloco de Código Apps Script -->
+                        <div class="relative rounded-xl bg-slate-950 border border-slate-800 overflow-hidden">
+                            <div class="flex items-center justify-between px-4 py-2.5 bg-slate-900 border-b border-slate-800">
+                                <span class="text-xs font-mono text-slate-400">Código.gs (Google Apps Script)</span>
+                                <button onclick="copyAppsScript()" class="px-3 py-1 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-medium flex items-center gap-1.5 transition-colors">
+                                    <i data-lucide="copy" class="w-3.5 h-3.5"></i>
+                                    Copiar Código
+                                </button>
+                            </div>
+                            <pre id="apps-script-code" class="p-4 text-xs font-mono text-emerald-400 overflow-x-auto max-h-64 leading-relaxed select-all">function doGet(e) {
+  return handleRequest(e);
+}
+
+function doPost(e) {
+  return handleRequest(e);
+}
+
+function handleRequest(e) {
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var sheet = ss.getSheetByName("Lancamentos");
+  
+  // Cria a aba e o cabeçalho automaticamente se não existir
+  if (!sheet) {
+    sheet = ss.insertSheet("Lancamentos");
+    sheet.appendRow(["id", "date", "description", "amount", "type", "debtCategory", "category", "status", "recurring"]);
+    sheet.getRange("A1:I1").setFontWeight("bold").setBackground("#4f46e5").setFontColor("#ffffff");
+  }
+
+  // Se for POST com dados para salvar/sincronizar
+  if (e.postData && e.postData.contents) {
+    var payload = JSON.parse(e.postData.contents);
+    if (payload.action === "syncAll" && Array.isArray(payload.transactions)) {
+      sheet.clearContents();
+      sheet.appendRow(["id", "date", "description", "amount", "type", "debtCategory", "category", "status", "recurring"]);
+      sheet.getRange("A1:I1").setFontWeight("bold").setBackground("#4f46e5").setFontColor("#ffffff");
+      
+      var rows = payload.transactions.map(function(t) {
+        return [t.id, t.date, t.description, Number(t.amount), t.type, t.debtCategory, t.category, t.status, t.recurring ? "Sim" : "Não"];
+      });
+      
+      if (rows.length > 0) {
+        sheet.getRange(2, 1, rows.length, 9).setValues(rows);
+      }
+      return ContentService.createTextOutput(JSON.stringify({ status: "success", count: rows.length }))
+        .setMimeType(ContentService.MimeType.JSON);
+    }
+  }
+
+  // Padrão GET: Lê todas as linhas da planilha
+  var data = sheet.getDataRange().getValues();
+  var transactions = [];
+  for (var i = 1; i < data.length; i++) {
+    if (!data[i][0]) continue;
+    var rawDate = data[i][1];
+    var formattedDate = rawDate instanceof Date ? Utilities.formatDate(rawDate, Session.getScriptTimeZone(), "yyyy-MM-dd") : String(rawDate);
+    transactions.push({
+      id: String(data[i][0]),
+      date: formattedDate,
+      description: String(data[i][2]),
+      amount: Number(data[i][3]) || 0,
+      type: String(data[i][4]),
+      debtCategory: String(data[i][5]),
+      category: String(data[i][6]),
+      status: String(data[i][7]),
+      recurring: data[i][8] === "Sim" || data[i][8] === true
+    });
+  }
+
+  return ContentService.createTextOutput(JSON.stringify({ status: "success", transactions: transactions }))
+    .setMimeType(ContentService.MimeType.JSON);
+}</pre>
+                        </div>
+
+                        <ol start="3" class="space-y-4 text-sm text-slate-600 dark:text-slate-300">
+                            <li class="flex gap-3">
+                                <span class="w-6 h-6 rounded-full bg-indigo-600 text-white text-xs font-bold flex items-center justify-center shrink-0 mt-0.5">3</span>
+                                <div>
+                                    <strong class="text-slate-900 dark:text-white">Implante como App da Web:</strong>
+                                    Clique no botão azul <strong>Implantar &gt; Nova implantação</strong>. Selecione o tipo <strong>App da Web</strong>. Em <em>"Quem pode acessar"</em>, escolha <strong>Qualquer pessoa</strong>. Autorize o acesso e copie a <strong>URL do App da Web</strong> gerada.
+                                </div>
+                            </li>
+                        </ol>
+                    </div>
+
+                    <!-- Coluna Direita: Configuração e Backup -->
+                    <div class="lg:col-span-5 space-y-6">
+                        <div class="p-5 rounded-2xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 space-y-4">
+                            <h3 class="text-sm font-bold text-slate-900 dark:text-white flex items-center gap-2">
+                                <i data-lucide="link" class="w-4 h-4 text-indigo-500"></i>
+                                Conectar Planilha
+                            </h3>
+
+                            <div>
+                                <label class="block text-xs font-medium text-slate-600 dark:text-slate-300 mb-1">
+                                    Link da Planilha Google no Drive (Opcional - para atalho rápido)
+                                </label>
+                                <input type="url" id="sheet-url-input" placeholder="https://docs.google.com/spreadsheets/d/..." class="w-full px-3 py-2 rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500">
+                            </div>
+
+                            <div>
+                                <label class="block text-xs font-medium text-slate-600 dark:text-slate-300 mb-1">
+                                    URL do Web App (Google Apps Script) *
+                                </label>
+                                <input type="url" id="script-url-input" placeholder="https://script.google.com/macros/s/.../exec" class="w-full px-3 py-2 rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500">
+                            </div>
+
+                            <div class="flex flex-col sm:flex-row gap-2 pt-2">
+                                <button onclick="saveSheetsConfig()" class="flex-1 py-2.5 px-4 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-semibold shadow-sm transition-all">
+                                    Salvar e Conectar
+                                </button>
+                                <button onclick="disconnectSheets()" class="py-2.5 px-4 rounded-xl bg-slate-200 dark:bg-slate-700 hover:bg-slate-300 dark:hover:bg-slate-600 text-slate-700 dark:text-slate-200 text-sm font-medium transition-all">
+                                    Desconectar
+                                </button>
+                            </div>
+
+                            <!-- Ações de Sincronização Manual -->
+                            <div id="manual-sync-box" class="hidden pt-4 border-t border-slate-200 dark:border-slate-700 space-y-2">
+                                <p class="text-xs font-semibold text-slate-500 uppercase">Sincronização Manual</p>
+                                <div class="grid grid-cols-2 gap-2">
+                                    <button onclick="syncWithGoogleSheets('push')" class="py-2 px-3 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold flex items-center justify-center gap-1.5">
+                                        <i data-lucide="upload-cloud" class="w-4 h-4"></i>
+                                        Enviar p/ Planilha
+                                    </button>
+                                    <button onclick="syncWithGoogleSheets('pull')" class="py-2 px-3 rounded-xl bg-sky-600 hover:bg-sky-700 text-white text-xs font-semibold flex items-center justify-center gap-1.5">
+                                        <i data-lucide="download-cloud" class="w-4 h-4"></i>
+                                        Baixar da Planilha
+                                    </button>
+                                </div>
+                                <a id="open-drive-sheet-link" href="#" target="_blank" class="hidden w-full py-2 px-3 rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-xs font-medium text-center text-indigo-600 dark:text-indigo-400 hover:underline flex items-center justify-center gap-1.5 mt-2">
+                                    <i data-lucide="external-link" class="w-3.5 h-3.5"></i>
+                                    Abrir Planilha no Google Drive
+                                </a>
+                            </div>
+                        </div>
+
+                        <!-- Backup Local (CSV / JSON) -->
+                        <div class="p-5 rounded-2xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 space-y-3">
+                            <h3 class="text-sm font-bold text-slate-900 dark:text-white flex items-center gap-2">
+                                <i data-lucide="hard-drive" class="w-4 h-4 text-amber-500"></i>
+                                Importar / Exportar Arquivos
+                            </h3>
+                            <p class="text-xs text-slate-500 dark:text-slate-400">
+                                Exporte seus dados em CSV para abrir no Google Planilhas ou importe um arquivo CSV/JSON.
+                            </p>
+                            <div class="flex flex-wrap gap-2">
+                                <button onclick="exportCSV()" class="flex-1 py-2 px-3 rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-800 text-xs font-semibold flex items-center justify-center gap-1.5">
+                                    <i data-lucide="file-down" class="w-4 h-4 text-emerald-500"></i>
+                                    Exportar CSV
+                                </button>
+                                <label class="flex-1 py-2 px-3 rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-800 text-xs font-semibold flex items-center justify-center gap-1.5 cursor-pointer">
+                                    <i data-lucide="file-up" class="w-4 h-4 text-indigo-500"></i>
+                                    Importar CSV/JSON
+                                    <input type="file" id="import-file" accept=".csv,.json" onchange="importFile(event)" class="hidden">
+                                </label>
+                            </div>
+                            <button onclick="resetDemoData()" class="w-full py-1.5 text-[11px] text-slate-400 hover:text-rose-500 transition-colors">
+                                Restaurar dados de demonstração
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <!-- ========================================================= -->
+    <!-- MODAL DE NOVO / EDITAR LANÇAMENTO                         -->
+    <!-- ========================================================= -->
+    <div id="transaction-modal" class="fixed inset-0 z-50 hidden items-center justify-center bg-slate-950/60 backdrop-blur-sm p-4">
+        <div class="bg-white dark:bg-slate-900 w-full max-w-lg rounded-2xl border border-slate-200 dark:border-slate-800 shadow-2xl overflow-hidden animate-in fade-in zoom-in-95 duration-150">
+            <div class="px-6 py-4 border-b border-slate-200 dark:border-slate-800 flex items-center justify-between">
+                <h3 id="modal-title" class="text-base font-bold text-slate-900 dark:text-white">Novo Lançamento</h3>
+                <button onclick="closeModal()" class="p-1.5 rounded-lg text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800">
+                    <i data-lucide="x" class="w-5 h-5"></i>
+                </button>
+            </div>
+
+            <form id="transaction-form" onsubmit="saveTransaction(event)" class="p-6 space-y-4">
+                <input type="hidden" id="tx-id">
+
+                <!-- Seletor Rápido: Entrada vs Saída -->
+                <div class="grid grid-cols-2 gap-2 p-1 rounded-xl bg-slate-100 dark:bg-slate-800">
+                    <button type="button" id="btn-type-income" onclick="setFormType('Entrada')" class="py-2 rounded-lg text-sm font-semibold flex items-center justify-center gap-2 transition-all">
+                        <i data-lucide="arrow-up-circle" class="w-4 h-4"></i>
+                        Entrada (Receita)
+                    </button>
+                    <button type="button" id="btn-type-expense" onclick="setFormType('Saída')" class="py-2 rounded-lg text-sm font-semibold flex items-center justify-center gap-2 transition-all">
+                        <i data-lucide="arrow-down-circle" class="w-4 h-4"></i>
+                        Saída (Dívida)
+                    </button>
+                </div>
+
+                <!-- Classificação da Dívida (Visível apenas quando Saída) -->
+                <div id="debt-classification-group" class="space-y-1.5">
+                    <label class="block text-xs font-semibold text-slate-700 dark:text-slate-300">
+                        Classificação da Dívida *
+                    </label>
+                    <div class="grid grid-cols-2 gap-3">
+                        <label class="cursor-pointer">
+                            <input type="radio" name="debtCategory" value="Dívida Fixa" class="peer sr-only" checked onchange="updateCategorySuggestions()">
+                            <div class="p-3 rounded-xl border border-slate-200 dark:border-slate-700 peer-checked:border-violet-500 peer-checked:bg-violet-500/10 transition-all">
+                                <div class="flex items-center gap-2 font-semibold text-xs text-slate-900 dark:text-white">
+                                    <span class="w-2.5 h-2.5 rounded-full bg-violet-500"></span>
+                                    Dívida Fixa
+                                </div>
+                                <p class="text-[11px] text-slate-500 mt-1">Aluguel, Internet, Luz, Parcelas fixas</p>
+                            </div>
+                        </label>
+                        <label class="cursor-pointer">
+                            <input type="radio" name="debtCategory" value="Outra Dívida" class="peer sr-only" onchange="updateCategorySuggestions()">
+                            <div class="p-3 rounded-xl border border-slate-200 dark:border-slate-700 peer-checked:border-amber-500 peer-checked:bg-amber-500/10 transition-all">
+                                <div class="flex items-center gap-2 font-semibold text-xs text-slate-900 dark:text-white">
+                                    <span class="w-2.5 h-2.5 rounded-full bg-amber-500"></span>
+                                    Outra Dívida
+                                </div>
+                                <p class="text-[11px] text-slate-500 mt-1">Mercado, Lazer, Cartão avulso, Saúde</p>
+                            </div>
+                        </label>
+                    </div>
+                </div>
+
+                <!-- Descrição -->
+                <div>
+                    <label class="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">Descrição *</label>
+                    <input type="text" id="tx-description" required placeholder="Ex: Aluguel Apartamento, Salário Mensal, Supermercado..." class="w-full px-3.5 py-2.5 rounded-xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500">
+                </div>
+
+                <!-- Valor e Data -->
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">Valor (R$) *</label>
+                        <input type="number" id="tx-amount" step="0.01" min="0.01" required placeholder="0,00" class="w-full px-3.5 py-2.5 rounded-xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-sm font-semibold focus:outline-none focus:ring-2 focus:ring-indigo-500">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">Data *</label>
+                        <input type="date" id="tx-date" required class="w-full px-3.5 py-2.5 rounded-xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500">
+                    </div>
+                </div>
+
+                <!-- Categoria Específica e Status -->
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">Categoria *</label>
+                        <select id="tx-category" class="w-full px-3.5 py-2.5 rounded-xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500">
+                            <!-- Preenchido dinamicamente -->
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">Status *</label>
+                        <select id="tx-status" class="w-full px-3.5 py-2.5 rounded-xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500">
+                            <option value="Pago">✅ Pago / Recebido</option>
+                            <option value="Pendente">⏳ Pendente</option>
+                        </select>
+                    </div>
+                </div>
+
+                <!-- Recorrência Mensal -->
+                <div class="flex items-center justify-between pt-1">
+                    <label class="flex items-center gap-2.5 cursor-pointer">
+                        <input type="checkbox" id="tx-recurring" class="w-4 h-4 rounded text-indigo-600 focus:ring-indigo-500 bg-slate-100 dark:bg-slate-800 border-slate-300 dark:border-slate-700">
+                        <span class="text-xs font-medium text-slate-700 dark:text-slate-300">Conta recorrente mensal (gera cópia para o próximo mês se desejar)</span>
+                    </label>
+                </div>
+
+                <div class="pt-4 border-t border-slate-200 dark:border-slate-800 flex items-center justify-end gap-2">
+                    <button type="button" onclick="closeModal()" class="px-4 py-2.5 rounded-xl bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-sm font-medium transition-colors">
+                        Cancelar
+                    </button>
+                    <button type="submit" class="px-5 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-semibold shadow-md shadow-indigo-600/20 transition-all">
+                        Salvar Lançamento
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Modal de Confirmação Personalizado (Substitui confirm()) -->
+    <div id="confirm-modal" class="fixed inset-0 z-50 hidden items-center justify-center bg-slate-950/60 backdrop-blur-sm p-4">
+        <div class="bg-white dark:bg-slate-900 w-full max-w-sm rounded-2xl border border-slate-200 dark:border-slate-800 p-6 shadow-2xl space-y-4">
+            <div class="flex items-center gap-3 text-rose-600 dark:text-rose-400">
+                <div class="w-10 h-10 rounded-xl bg-rose-500/10 flex items-center justify-center shrink-0">
+                    <i data-lucide="alert-triangle" class="w-5 h-5"></i>
+                </div>
+                <h3 id="confirm-title" class="text-base font-bold text-slate-900 dark:text-white">Confirmar Exclusão</h3>
+            </div>
+            <p id="confirm-message" class="text-sm text-slate-600 dark:text-slate-300">Tem certeza que deseja excluir este lançamento?</p>
+            <div class="flex justify-end gap-2 pt-2">
+                <button onclick="closeConfirmModal()" class="px-4 py-2 rounded-xl bg-slate-100 dark:bg-slate-800 text-sm font-medium">Cancelar</button>
+                <button id="confirm-yes-btn" class="px-4 py-2 rounded-xl bg-rose-600 hover:bg-rose-700 text-white text-sm font-semibold">Confirmar</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // =========================================================================
+        // ESTADO GLOBAL E CONFIGURAÇÕES
+        // =========================================================================
+        const STORAGE_KEY = 'financontrol_transactions_v1';
+        const CONFIG_KEY = 'financontrol_sheets_config_v1';
+
+        let transactions = [];
+        let sheetsConfig = {
+            sheetUrl: '',
+            scriptUrl: ''
+        };
+
+        let currentFormType = 'Saída';
+        let charts = {
+            doughnut: null,
+            bar: null,
+            categories: null
+        };
+
+        const CATEGORIES = {
+            'Entrada': ['Salário', 'Freelance / Extra', 'Investimentos / Dividendos', 'Vendas', 'Outros Rendimentos'],
+            'Dívida Fixa': ['Moradia / Aluguel', 'Condomínio / IPTU', 'Energia / Água / Gás', 'Internet / Telefone', 'Assinaturas / Streaming', 'Financiamento / Parcela Fixa', 'Educação / Mensalidade', 'Plano de Saúde'],
+            'Outra Dívida': ['Supermercado', 'Cartão de Crédito (Avulso)', 'Alimentação / Delivery', 'Transporte / Combustível', 'Lazer / Viagens', 'Saúde / Farmácia', 'Compras / Vestuário', 'Imprevistos / Outros']
+        };
+
+        // =========================================================================
+        // INICIALIZAÇÃO
+        // =========================================================================
+        window.addEventListener('DOMContentLoaded', async () => {
+            initTheme();
+            loadConfig();
+            loadTransactions();
+            populateYearFilter();
+            setDefaultPeriodFilter();
+            renderAll();
+            lucide.createIcons();
+
+            if (sheetsConfig.scriptUrl) {
+                await syncWithGoogleSheets('pull', true, false, true);
+            }
+        });
+
+        function initTheme() {
+            const savedTheme = localStorage.getItem('financontrol_theme');
+            if (savedTheme === 'light') {
+                document.documentElement.classList.remove('dark');
+            } else {
+                document.documentElement.classList.add('dark');
+            }
+        }
+
+        function toggleTheme() {
+            const html = document.documentElement;
+            html.classList.toggle('dark');
+            localStorage.setItem('financontrol_theme', html.classList.contains('dark') ? 'dark' : 'light');
+            renderCharts();
+        }
+
+        function switchTab(tabName) {
+            const dashTab = document.getElementById('tab-dashboard');
+            const sheetsTab = document.getElementById('tab-sheets');
+
+            const navDash = document.getElementById('nav-dashboard');
+            const navSheets = document.getElementById('nav-sheets');
+            const navDashMob = document.getElementById('nav-dashboard-mob');
+            const navSheetsMob = document.getElementById('nav-sheets-mob');
+
+            if (tabName === 'dashboard') {
+                dashTab.classList.remove('hidden');
+                sheetsTab.classList.add('hidden');
+
+                navDash.className = "nav-btn px-4 py-1.5 rounded-lg text-sm font-medium transition-all flex items-center gap-2 bg-white dark:bg-slate-900 text-indigo-600 dark:text-indigo-400 shadow-sm";
+                navSheets.className = "nav-btn px-4 py-1.5 rounded-lg text-sm font-medium text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white transition-all flex items-center gap-2";
+
+                navDashMob.className = "flex-1 py-1.5 rounded-lg text-xs font-semibold text-center bg-indigo-600 text-white";
+                navSheetsMob.className = "flex-1 py-1.5 rounded-lg text-xs font-semibold text-center bg-slate-200 dark:bg-slate-800 text-slate-700 dark:text-slate-300";
+                renderCharts();
+            } else {
+                dashTab.classList.add('hidden');
+                sheetsTab.classList.remove('hidden');
+
+                navSheets.className = "nav-btn px-4 py-1.5 rounded-lg text-sm font-medium transition-all flex items-center gap-2 bg-white dark:bg-slate-900 text-indigo-600 dark:text-indigo-400 shadow-sm";
+                navDash.className = "nav-btn px-4 py-1.5 rounded-lg text-sm font-medium text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white transition-all flex items-center gap-2";
+
+                navSheetsMob.className = "flex-1 py-1.5 rounded-lg text-xs font-semibold text-center bg-indigo-600 text-white";
+                navDashMob.className = "flex-1 py-1.5 rounded-lg text-xs font-semibold text-center bg-slate-200 dark:bg-slate-800 text-slate-700 dark:text-slate-300";
+            }
+            lucide.createIcons();
+        }
+
+        // =========================================================================
+        // DADOS INICIAIS REALISTAS E PERSISTÊNCIA LOCAL
+        // =========================================================================
+        function getDemoTransactions() {
+            const now = new Date();
+            const y = now.getFullYear();
+            const m = String(now.getMonth() + 1).padStart(2, '0');
+            const prevM = now.getMonth() === 0 ? '12' : String(now.getMonth()).padStart(2, '0');
+            const prevY = now.getMonth() === 0 ? y - 1 : y;
+
+            return [
+                { id: 'tx-1', date: `${y}-${m}-05`, description: 'Salário Mensal CLT', amount: 5800.00, type: 'Entrada', debtCategory: 'Receita', category: 'Salário', status: 'Pago', recurring: true },
+                { id: 'tx-2', date: `${y}-${m}-10`, description: 'Projeto Freelance Website', amount: 1450.00, type: 'Entrada', debtCategory: 'Receita', category: 'Freelance / Extra', status: 'Pago', recurring: false },
+                { id: 'tx-3', date: `${y}-${m}-08`, description: 'Aluguel + Condomínio', amount: 1650.00, type: 'Saída', debtCategory: 'Dívida Fixa', category: 'Moradia / Aluguel', status: 'Pago', recurring: true },
+                { id: 'tx-4', date: `${y}-${m}-12`, description: 'Internet Fibra 500MB', amount: 119.90, type: 'Saída', debtCategory: 'Dívida Fixa', category: 'Internet / Telefone', status: 'Pago', recurring: true },
+                { id: 'tx-5', date: `${y}-${m}-15`, description: 'Conta de Energia Elétrica', amount: 210.50, type: 'Saída', debtCategory: 'Dívida Fixa', category: 'Energia / Água / Gás', status: 'Pago', recurring: true },
+                { id: 'tx-6', date: `${y}-${m}-20`, description: 'Parcela Financiamento Veículo', amount: 780.00, type: 'Saída', debtCategory: 'Dívida Fixa', category: 'Financiamento / Parcela Fixa', status: 'Pendente', recurring: true },
+                { id: 'tx-7', date: `${y}-${m}-14`, description: 'Compras Supermercado do Mês', amount: 890.40, type: 'Saída', debtCategory: 'Outra Dívida', category: 'Supermercado', status: 'Pago', recurring: false },
+                { id: 'tx-8', date: `${y}-${m}-18`, description: 'Fatura Cartão Nubank (Avulsos)', amount: 640.00, type: 'Saída', debtCategory: 'Outra Dívida', category: 'Cartão de Crédito (Avulso)', status: 'Pendente', recurring: false },
+                { id: 'tx-9', date: `${y}-${m}-22`, description: 'Jantar e Cinema Fim de Semana', amount: 230.00, type: 'Saída', debtCategory: 'Outra Dívida', category: 'Lazer / Viagens', status: 'Pago', recurring: false },
+
+                { id: 'tx-10', date: `${prevY}-${prevM}-05`, description: 'Salário Mensal CLT', amount: 5800.00, type: 'Entrada', debtCategory: 'Receita', category: 'Salário', status: 'Pago', recurring: true },
+                { id: 'tx-11', date: `${prevY}-${prevM}-08`, description: 'Aluguel + Condomínio', amount: 1650.00, type: 'Saída', debtCategory: 'Dívida Fixa', category: 'Moradia / Aluguel', status: 'Pago', recurring: true },
+                { id: 'tx-12', date: `${prevY}-${prevM}-20`, description: 'Parcela Financiamento Veículo', amount: 780.00, type: 'Saída', debtCategory: 'Dívida Fixa', category: 'Financiamento / Parcela Fixa', status: 'Pago', recurring: true },
+                { id: 'tx-13', date: `${prevY}-${prevM}-16`, description: 'Supermercado & Açougue', amount: 950.00, type: 'Saída', debtCategory: 'Outra Dívida', category: 'Supermercado', status: 'Pago', recurring: false },
+                { id: 'tx-14', date: `${prevY}-${prevM}-25`, description: 'Manutenção Preventiva Carro', amount: 480.00, type: 'Saída', debtCategory: 'Outra Dívida', category: 'Transporte / Combustível', status: 'Pago', recurring: false }
+            ];
+        }
+
+        function loadTransactions() {
+            const raw = localStorage.getItem(STORAGE_KEY);
+            if (raw !== null) {
+                try {
+                    const parsed = JSON.parse(raw);
+                    transactions = Array.isArray(parsed) ? parsed : [];
+                    return;
+                } catch (e) {
+                    transactions = [];
+                }
+            }
+
+            if (!sheetsConfig.scriptUrl) {
+                transactions = getDemoTransactions();
+                saveLocalTransactions();
+            } else {
+                transactions = [];
+            }
+        }
+
+        function saveLocalTransactions() {
+            localStorage.setItem(STORAGE_KEY, JSON.stringify(transactions));
+        }
+
+        function resetDemoData() {
+            openConfirmModal(
+                'Restaurar Dados de Exemplo',
+                'Isso substituirá os lançamentos locais atuais pelos dados de demonstração. Deseja continuar?',
+                () => {
+                    transactions = getDemoTransactions();
+                    saveLocalTransactions();
+                    populateYearFilter();
+                    renderAll();
+                    showToast('Dados de demonstração restaurados!', 'success');
+                }
+            );
+        }
+
+        // =========================================================================
+        // FILTROS E RENDERIZAÇÃO GERAL
+        // =========================================================================
+        function populateYearFilter() {
+            const yearSelect = document.getElementById('filter-year');
+            const currentVal = yearSelect.value;
+            const years = new Set([new Date().getFullYear().toString()]);
+
+            transactions.forEach(t => {
+                if (t.date && t.date.length >= 4) {
+                    years.add(t.date.substring(0, 4));
+                }
+            });
+
+            const sortedYears = Array.from(years).sort((a, b) => b.localeCompare(a));
+            yearSelect.innerHTML = '<option value="ALL">Todos os Anos</option>';
+            sortedYears.forEach(y => {
+                const opt = document.createElement('option');
+                opt.value = y;
+                opt.textContent = y;
+                yearSelect.appendChild(opt);
+            });
+
+            if (sortedYears.includes(currentVal) || currentVal === 'ALL') {
+                yearSelect.value = currentVal;
+            }
+        }
+
+        function setDefaultPeriodFilter() {
+            const now = new Date();
+            const m = String(now.getMonth() + 1).padStart(2, '0');
+            const y = String(now.getFullYear());
+            document.getElementById('filter-month').value = m;
+            document.getElementById('filter-year').value = y;
+        }
+
+        function getPeriodFilteredTransactions() {
+            const month = document.getElementById('filter-month').value;
+            const year = document.getElementById('filter-year').value;
+
+            return transactions.filter(t => {
+                if (!t.date) return false;
+                const [tYear, tMonth] = t.date.split('-');
+                const matchYear = year === 'ALL' || tYear === year;
+                const matchMonth = month === 'ALL' || tMonth === month;
+                return matchYear && matchMonth;
+            });
+        }
+
+        function renderAll() {
+            const periodData = getPeriodFilteredTransactions();
+            updateKPIs(periodData);
+            renderTable();
+            renderCharts();
+        }
+
+        // =========================================================================
+        // CÁLCULO DE INDICADORES (KPIs)
+        // =========================================================================
+        function formatBRL(value) {
+            return new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(value || 0);
+        }
+
+        function updateKPIs(data) {
+            let totalIncome = 0;
+            let paidIncome = 0;
+            let incomeCount = 0;
+            let paidFixed = 0;
+            let paidVariable = 0;
+            let totalPending = 0;
+            let pendingCount = 0;
+
+            data.forEach(t => {
+                const val = Number(t.amount) || 0;
+                const isPaid = t.status === 'Pago';
+                if (t.type === 'Entrada') {
+                    totalIncome += val;
+                    if (isPaid) paidIncome += val;
+                    incomeCount++;
+                } else {
+                    if (isPaid) {
+                        if (t.debtCategory === 'Dívida Fixa') {
+                            paidFixed += val;
+                        } else {
+                            paidVariable += val;
+                        }
+                    } else {
+                        totalPending += val;
+                        pendingCount++;
+                    }
+                }
+            });
+
+            const paidExpense = paidFixed + paidVariable;
+            const totalCommittedExpense = paidExpense + totalPending;
+            const accountBalance = paidIncome - paidExpense;
+            const projectedBalance = totalIncome - totalCommittedExpense;
+            const fixedPct = totalIncome > 0 ? ((paidFixed / totalIncome) * 100).toFixed(1) : '0.0';
+            const variablePct = totalIncome > 0 ? ((paidVariable / totalIncome) * 100).toFixed(1) : '0.0';
+
+            const balanceEl = document.getElementById('kpi-balance');
+            balanceEl.textContent = formatBRL(accountBalance);
+            balanceEl.className = `text-xl font-bold tracking-tight ${accountBalance >= 0 ? 'text-indigo-600 dark:text-indigo-400' : 'text-rose-600 dark:text-rose-400'}`;
+            document.getElementById('kpi-balance-sub').textContent = `Pago: -${formatBRL(paidExpense)} • Previsto: ${formatBRL(projectedBalance)}`;
+
+            document.getElementById('kpi-income').textContent = formatBRL(totalIncome);
+            document.getElementById('kpi-income-count').textContent = `${incomeCount} ${incomeCount === 1 ? 'receita' : 'receitas'}`;
+
+            document.getElementById('kpi-expense').textContent = formatBRL(paidExpense);
+            document.getElementById('kpi-expense-count').textContent = `Pendentes: ${formatBRL(totalPending)}`;
+
+            document.getElementById('kpi-fixed').textContent = formatBRL(paidFixed);
+            document.getElementById('kpi-fixed-pct').textContent = `${fixedPct}% da renda (pago)`;
+
+            document.getElementById('kpi-variable').textContent = formatBRL(paidVariable);
+            document.getElementById('kpi-variable-pct').textContent = `${variablePct}% da renda (pago)`;
+
+            document.getElementById('kpi-pending').textContent = formatBRL(totalPending);
+            document.getElementById('kpi-pending-count').textContent = `${pendingCount} ${pendingCount === 1 ? 'conta em aberto' : 'contas em aberto'}`;
+        }
+
+        // =========================================================================
+        // TABELA DE LANÇAMENTOS
+        // =========================================================================
+        function renderTable() {
+            const periodData = getPeriodFilteredTransactions();
+            const search = document.getElementById('search-input').value.toLowerCase().trim();
+            const classFilter = document.getElementById('filter-class').value;
+            const statusFilter = document.getElementById('filter-status').value;
+            const sortBy = document.getElementById('filter-sort').value;
+
+            let filtered = periodData.filter(t => {
+                const matchSearch = !search ||
+                    t.description.toLowerCase().includes(search) ||
+                    t.category.toLowerCase().includes(search);
+
+                let matchClass = true;
+                if (classFilter === 'Entrada') matchClass = t.type === 'Entrada';
+                else if (classFilter === 'Dívida Fixa') matchClass = t.type === 'Saída' && t.debtCategory === 'Dívida Fixa';
+                else if (classFilter === 'Outra Dívida') matchClass = t.type === 'Saída' && t.debtCategory !== 'Dívida Fixa';
+
+                const matchStatus = statusFilter === 'ALL' || t.status === statusFilter;
+
+                return matchSearch && matchClass && matchStatus;
+            });
+
+            filtered.sort((a, b) => {
+                if (sortBy === 'date-desc') return b.date.localeCompare(a.date);
+                if (sortBy === 'date-asc') return a.date.localeCompare(b.date);
+                if (sortBy === 'amount-desc') return b.amount - a.amount;
+                if (sortBy === 'amount-asc') return a.amount - b.amount;
+                return 0;
+            });
+
+            const tbody = document.getElementById('transactions-tbody');
+            const emptyState = document.getElementById('empty-state');
+            tbody.innerHTML = '';
+
+            if (filtered.length === 0) {
+                emptyState.classList.remove('hidden');
+                return;
+            }
+            emptyState.classList.add('hidden');
+
+            filtered.forEach(t => {
+                const tr = document.createElement('tr');
+                tr.className = 'hover:bg-slate-50 dark:hover:bg-slate-800/40 transition-colors group';
+
+                const [y, m, d] = t.date.split('-');
+                const formattedDate = `${d}/${m}/${y}`;
+
+                let classBadge = '';
+                if (t.type === 'Entrada') {
+                    classBadge = `<span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20"><span class="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>Entrada</span>`;
+                } else if (t.debtCategory === 'Dívida Fixa') {
+                    classBadge = `<span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium bg-violet-500/10 text-violet-600 dark:text-violet-400 border border-violet-500/20"><span class="w-1.5 h-1.5 rounded-full bg-violet-500"></span>Dívida Fixa</span>`;
+                } else {
+                    classBadge = `<span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/20"><span class="w-1.5 h-1.5 rounded-full bg-amber-500"></span>Outra Dívida</span>`;
+                }
+
+                const isPaid = t.status === 'Pago';
+                const statusBtn = `
+                    <button onclick="toggleStatus('${t.id}')" title="Clique para alternar Pago/Pendente" class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-semibold transition-all ${
+                        isPaid
+                        ? 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 hover:bg-emerald-500/20'
+                        : 'bg-orange-500/10 text-orange-600 dark:text-orange-400 hover:bg-orange-500/20 ring-1 ring-orange-500/30'
+                    }">
+                        <i data-lucide="${isPaid ? 'check-circle-2' : 'clock'}" class="w-3.5 h-3.5"></i>
+                        ${isPaid ? 'Pago' : 'Pendente'}
+                    </button>
+                `;
+
+                const amountClass = t.type === 'Entrada'
+                    ? 'text-emerald-600 dark:text-emerald-400 font-bold'
+                    : 'text-slate-800 dark:text-slate-100 font-semibold';
+
+                const recurringIcon = t.recurring
+                    ? `<span title="Recorrente mensal" class="text-indigo-500 ml-1.5 inline-flex align-middle"><i data-lucide="repeat" class="w-3.5 h-3.5"></i></span>`
+                    : '';
+
+                tr.innerHTML = `
+                    <td class="py-3.5 px-4 whitespace-nowrap text-xs text-slate-500 dark:text-slate-400 font-medium">${formattedDate}</td>
+                    <td class="py-3.5 px-4 font-medium text-slate-900 dark:text-slate-100">
+                        ${escapeHTML(t.description)} ${recurringIcon}
+                    </td>
+                    <td class="py-3.5 px-4 whitespace-nowrap">${classBadge}</td>
+                    <td class="py-3.5 px-4 whitespace-nowrap text-xs text-slate-600 dark:text-slate-300">${escapeHTML(t.category)}</td>
+                    <td class="py-3.5 px-4 whitespace-nowrap">${statusBtn}</td>
+                    <td class="py-3.5 px-4 whitespace-nowrap text-right ${amountClass}">
+                        ${t.type === 'Entrada' ? '+' : '-'} ${formatBRL(t.amount)}
+                    </td>
+                    <td class="py-3.5 px-4 whitespace-nowrap text-center">
+                        <div class="inline-flex items-center gap-1">
+                            <button onclick="openModal('${t.id}')" class="p-1.5 rounded-lg text-slate-400 hover:text-indigo-600 dark:hover:text-indigo-400 hover:bg-indigo-500/10 transition-colors" title="Editar">
+                                <i data-lucide="pencil" class="w-4 h-4"></i>
+                            </button>
+                            <button onclick="deleteTransaction('${t.id}')" class="p-1.5 rounded-lg text-slate-400 hover:text-rose-600 dark:hover:text-rose-400 hover:bg-rose-500/10 transition-colors" title="Excluir">
+                                <i data-lucide="trash-2" class="w-4 h-4"></i>
+                            </button>
+                        </div>
+                    </td>
+                `;
+                tbody.appendChild(tr);
+            });
+
+            lucide.createIcons();
+        }
+
+        // =========================================================================
+        // GRÁFICOS INTERATIVOS (CHART.JS)
+        // =========================================================================
+        function renderCharts() {
+            const isDark = document.documentElement.classList.contains('dark');
+            const textColor = isDark ? '#cbd5e1' : '#475569';
+            const gridColor = isDark ? 'rgba(148, 163, 184, 0.1)' : 'rgba(148, 163, 184, 0.2)';
+
+            const periodData = getPeriodFilteredTransactions();
+
+            let income = 0, fixed = 0, variable = 0;
+            periodData.forEach(t => {
+                const v = Number(t.amount) || 0;
+                if (t.type === 'Entrada') {
+                    income += v;
+                } else if (t.status === 'Pago') {
+                    if (t.debtCategory === 'Dívida Fixa') fixed += v;
+                    else variable += v;
+                }
+            });
+            const freeBalance = Math.max(0, income - (fixed + variable));
+
+            if (charts.doughnut) charts.doughnut.destroy();
+            const ctxDoughnut = document.getElementById('chart-doughnut').getContext('2d');
+            charts.doughnut = new Chart(ctxDoughnut, {
+                type: 'doughnut',
+                data: {
+                    labels: ['Dívidas Fixas', 'Outras Dívidas', 'Saldo Livre'],
+                    datasets: [{
+                        data: [fixed, variable, freeBalance],
+                        backgroundColor: ['#8b5cf6', '#f59e0b', '#10b981'],
+                        borderColor: isDark ? '#0f172a' : '#ffffff',
+                        borderWidth: 3,
+                        hoverOffset: 6
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    cutout: '68%',
+                    plugins: {
+                        legend: {
+                            position: 'bottom',
+                            labels: { color: textColor, usePointStyle: true, padding: 16, font: { size: 11, family: 'Inter' } }
+                        },
+                        tooltip: {
+                            callbacks: {
+                                label: (ctx) => ` ${ctx.label}: ${formatBRL(ctx.raw)}`
+                            }
+                        }
+                    }
+                }
+            });
+
+            const selectedYear = document.getElementById('filter-year').value;
+            const monthlyMap = {};
+            const monthNames = ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez'];
+
+            transactions.forEach(t => {
+                if (!t.date) return;
+                const [y, m] = t.date.split('-');
+                if (selectedYear !== 'ALL' && y !== selectedYear) return;
+                const key = `${y}-${m}`;
+                if (!monthlyMap[key]) {
+                    monthlyMap[key] = { label: `${monthNames[parseInt(m, 10) - 1]}/${y.slice(2)}`, income: 0, fixed: 0, variable: 0 };
+                }
+                const v = Number(t.amount) || 0;
+                if (t.type === 'Entrada') {
+                    monthlyMap[key].income += v;
+                } else if (t.status === 'Pago') {
+                    if (t.debtCategory === 'Dívida Fixa') monthlyMap[key].fixed += v;
+                    else monthlyMap[key].variable += v;
+                }
+            });
+
+            const sortedKeys = Object.keys(monthlyMap).sort().slice(-6);
+            const barLabels = sortedKeys.map(k => monthlyMap[k].label);
+            const barIncome = sortedKeys.map(k => monthlyMap[k].income);
+            const barFixed = sortedKeys.map(k => monthlyMap[k].fixed);
+            const barVariable = sortedKeys.map(k => monthlyMap[k].variable);
+
+            if (charts.bar) charts.bar.destroy();
+            const ctxBar = document.getElementById('chart-bar').getContext('2d');
+            charts.bar = new Chart(ctxBar, {
+                type: 'bar',
+                data: {
+                    labels: barLabels.length ? barLabels : ['Sem dados'],
+                    datasets: [
+                        {
+                            label: 'Entradas',
+                            data: barIncome.length ? barIncome : [0],
+                            backgroundColor: '#10b981',
+                            borderRadius: 6,
+                            stack: 'income'
+                        },
+                        {
+                            label: 'Dívidas Fixas',
+                            data: barFixed.length ? barFixed : [0],
+                            backgroundColor: '#8b5cf6',
+                            borderRadius: 6,
+                            stack: 'expense'
+                        },
+                        {
+                            label: 'Outras Dívidas',
+                            data: barVariable.length ? barVariable : [0],
+                            backgroundColor: '#f59e0b',
+                            borderRadius: 6,
+                            stack: 'expense'
+                        }
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    scales: {
+                        x: {
+                            grid: { display: false },
+                            ticks: { color: textColor, font: { size: 11 } }
+                        },
+                        y: {
+                            grid: { color: gridColor },
+                            ticks: {
+                                color: textColor,
+                                font: { size: 11 },
+                                callback: (val) => 'R$ ' + val.toLocaleString('pt-BR')
+                            }
+                        }
+                    },
+                    plugins: {
+                        legend: {
+                            position: 'bottom',
+                            labels: { color: textColor, usePointStyle: true, font: { size: 11 } }
+                        },
+                        tooltip: {
+                            callbacks: {
+                                label: (ctx) => ` ${ctx.dataset.label}: ${formatBRL(ctx.raw)}`
+                            }
+                        }
+                    }
+                }
+            });
+
+            const catTotals = {};
+            periodData.filter(t => t.type === 'Saída' && t.status === 'Pago').forEach(t => {
+                catTotals[t.category] = (catTotals[t.category] || 0) + (Number(t.amount) || 0);
+            });
+
+            const topCats = Object.entries(catTotals)
+                .sort((a, b) => b[1] - a[1])
+                .slice(0, 5);
+
+            if (charts.categories) charts.categories.destroy();
+            const ctxCat = document.getElementById('chart-categories').getContext('2d');
+            charts.categories = new Chart(ctxCat, {
+                type: 'bar',
+                data: {
+                    labels: topCats.length ? topCats.map(c => c[0]) : ['Sem gastos'],
+                    datasets: [{
+                        label: 'Total Gasto',
+                        data: topCats.length ? topCats.map(c => c[1]) : [0],
+                        backgroundColor: ['#6366f1', '#8b5cf6', '#ec4899', '#f59e0b', '#06b6d4'],
+                        borderRadius: 6
+                    }]
+                },
+                options: {
+                    indexAxis: 'y',
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    scales: {
+                        x: {
+                            grid: { color: gridColor },
+                            ticks: { color: textColor, font: { size: 10 } }
+                        },
+                        y: {
+                            grid: { display: false },
+                            ticks: { color: textColor, font: { size: 11 } }
+                        }
+                    },
+                    plugins: {
+                        legend: { display: false },
+                        tooltip: {
+                            callbacks: {
+                                label: (ctx) => ` ${formatBRL(ctx.raw)}`
+                            }
+                        }
+                    }
+                }
+            });
+        }
+
+        // =========================================================================
+        // MODAL E CRUD DE LANÇAMENTOS
+        // =========================================================================
+        function openModal(editId = null) {
+            const modal = document.getElementById('transaction-modal');
+            const title = document.getElementById('modal-title');
+            const form = document.getElementById('transaction-form');
+
+            form.reset();
+            document.getElementById('tx-id').value = '';
+
+            if (editId) {
+                const tx = transactions.find(t => t.id === editId);
+                if (!tx) return;
+
+                title.textContent = 'Editar Lançamento';
+                document.getElementById('tx-id').value = tx.id;
+                setFormType(tx.type);
+
+                if (tx.type === 'Saída') {
+                    const radios = document.getElementsByName('debtCategory');
+                    radios.forEach(r => r.checked = (r.value === tx.debtCategory));
+                    updateCategorySuggestions();
+                }
+
+                document.getElementById('tx-description').value = tx.description;
+                document.getElementById('tx-amount').value = tx.amount;
+                document.getElementById('tx-date').value = tx.date;
+                document.getElementById('tx-category').value = tx.category;
+                document.getElementById('tx-status').value = tx.status;
+                document.getElementById('tx-recurring').checked = !!tx.recurring;
+            } else {
+                title.textContent = 'Novo Lançamento';
+                setFormType('Saída');
+                document.getElementById('tx-date').value = new Date().toISOString().split('T')[0];
+            }
+
+            modal.classList.remove('hidden');
+            modal.classList.add('flex');
+            lucide.createIcons();
+        }
+
+        function closeModal() {
+            const modal = document.getElementById('transaction-modal');
+            modal.classList.add('hidden');
+            modal.classList.remove('flex');
+        }
+
+        function setFormType(type) {
+            currentFormType = type;
+            const btnIn = document.getElementById('btn-type-income');
+            const btnOut = document.getElementById('btn-type-expense');
+            const debtGroup = document.getElementById('debt-classification-group');
+
+            if (type === 'Entrada') {
+                btnIn.className = 'py-2 rounded-lg text-sm font-semibold flex items-center justify-center gap-2 transition-all bg-emerald-600 text-white shadow-sm';
+                btnOut.className = 'py-2 rounded-lg text-sm font-semibold flex items-center justify-center gap-2 transition-all text-slate-600 dark:text-slate-300';
+                debtGroup.classList.add('hidden');
+            } else {
+                btnOut.className = 'py-2 rounded-lg text-sm font-semibold flex items-center justify-center gap-2 transition-all bg-rose-600 text-white shadow-sm';
+                btnIn.className = 'py-2 rounded-lg text-sm font-semibold flex items-center justify-center gap-2 transition-all text-slate-600 dark:text-slate-300';
+                debtGroup.classList.remove('hidden');
+            }
+            updateCategorySuggestions();
+        }
+
+        function updateCategorySuggestions() {
+            const catSelect = document.getElementById('tx-category');
+            let listKey = 'Entrada';
+
+            if (currentFormType === 'Saída') {
+                const selectedRadio = document.querySelector('input[name="debtCategory"]:checked');
+                listKey = selectedRadio ? selectedRadio.value : 'Dívida Fixa';
+            }
+
+            const options = CATEGORIES[listKey] || [];
+            catSelect.innerHTML = options.map(c => `<option value="${c}">${c}</option>`).join('');
+        }
+
+        function saveTransaction(e) {
+            e.preventDefault();
+
+            const id = document.getElementById('tx-id').value;
+            const description = document.getElementById('tx-description').value.trim();
+            const amount = parseFloat(document.getElementById('tx-amount').value);
+            const date = document.getElementById('tx-date').value;
+            const category = document.getElementById('tx-category').value;
+            const status = document.getElementById('tx-status').value;
+            const recurring = document.getElementById('tx-recurring').checked;
+
+            let debtCategory = 'Receita';
+            if (currentFormType === 'Saída') {
+                const selectedRadio = document.querySelector('input[name="debtCategory"]:checked');
+                debtCategory = selectedRadio ? selectedRadio.value : 'Dívida Fixa';
+            }
+
+            if (id) {
+                const idx = transactions.findIndex(t => t.id === id);
+                if (idx !== -1) {
+                    transactions[idx] = { id, date, description, amount, type: currentFormType, debtCategory, category, status, recurring };
+                }
+                showToast('Lançamento atualizado!', 'success');
+            } else {
+                const newTx = {
+                    id: 'tx-' + Date.now(),
+                    date,
+                    description,
+                    amount,
+                    type: currentFormType,
+                    debtCategory,
+                    category,
+                    status,
+                    recurring
+                };
+                transactions.unshift(newTx);
+
+                if (recurring) {
+                    const nextMonthDate = addOneMonth(date);
+                    transactions.unshift({
+                        id: 'tx-' + (Date.now() + 1),
+                        date: nextMonthDate,
+                        description,
+                        amount,
+                        type: currentFormType,
+                        debtCategory,
+                        category,
+                        status: 'Pendente',
+                        recurring: true
+                    });
+                    showToast('Lançamento salvo + cópia recorrente criada para o próximo mês!', 'success');
+                } else {
+                    showToast('Lançamento adicionado com sucesso!', 'success');
+                }
+            }
+
+            saveLocalTransactions();
+            populateYearFilter();
+            renderAll();
+            closeModal();
+
+            if (sheetsConfig.scriptUrl) {
+                syncWithGoogleSheets('push', true);
+            }
+        }
+
+        function addOneMonth(dateStr) {
+            const [y, m, d] = dateStr.split('-').map(Number);
+            const dt = new Date(y, m, d);
+            const ny = dt.getFullYear();
+            const nm = String(dt.getMonth() + 1).padStart(2, '0');
+            const nd = String(Math.min(d, new Date(ny, dt.getMonth() + 1, 0).getDate())).padStart(2, '0');
+            return `${ny}-${nm}-${nd}`;
+        }
+
+        function toggleStatus(id) {
+            const tx = transactions.find(t => t.id === id);
+            if (!tx) return;
+            tx.status = tx.status === 'Pago' ? 'Pendente' : 'Pago';
+            saveLocalTransactions();
+            renderAll();
+            if (tx.type === 'Saída') {
+                if (tx.status === 'Pago') {
+                    showToast(`"${tx.description}" marcada como Paga: ${formatBRL(tx.amount)} descontado do saldo e das contas pendentes.`, 'success');
+                } else {
+                    showToast(`"${tx.description}" voltou para Pendente: ${formatBRL(tx.amount)} adicionado às contas pendentes.`, 'info');
+                }
+            } else {
+                showToast(`Status da entrada alterado para ${tx.status}`, 'info');
+            }
+
+            if (sheetsConfig.scriptUrl) {
+                syncWithGoogleSheets('push', true);
+            }
+        }
+
+        function deleteTransaction(id) {
+            openConfirmModal(
+                'Excluir Lançamento',
+                'Deseja realmente remover este lançamento do seu controle financeiro?',
+                () => {
+                    transactions = transactions.filter(t => t.id !== id);
+                    saveLocalTransactions();
+                    renderAll();
+                    showToast('Lançamento excluído.', 'info');
+
+                    if (sheetsConfig.scriptUrl) {
+                        syncWithGoogleSheets('push', true);
+                    }
+                }
+            );
+        }
+
+        // =========================================================================
+        // INTEGRAÇÃO COM GOOGLE SHEETS (GOOGLE DRIVE VIA APPS SCRIPT)
+        // =========================================================================
+        function loadConfig() {
+            const raw = localStorage.getItem(CONFIG_KEY);
+            if (raw) {
+                try {
+                    sheetsConfig = JSON.parse(raw);
+                } catch (e) {}
+            }
+            document.getElementById('sheet-url-input').value = sheetsConfig.sheetUrl || '';
+            document.getElementById('script-url-input').value = sheetsConfig.scriptUrl || '';
+            updateSyncUI();
+        }
+
+        async function saveSheetsConfig() {
+            const sheetUrl = document.getElementById('sheet-url-input').value.trim();
+            const scriptUrl = document.getElementById('script-url-input').value.trim();
+
+            if (!scriptUrl || !scriptUrl.startsWith('https://script.google.com/')) {
+                showToast('Insira uma URL válida do Web App do Google Apps Script.', 'error');
+                return;
+            }
+
+            sheetsConfig = { sheetUrl, scriptUrl };
+            localStorage.setItem(CONFIG_KEY, JSON.stringify(sheetsConfig));
+            updateSyncUI();
+            showToast('Conectado! Sincronizando com a planilha...', 'info');
+            await syncWithGoogleSheets('pull', false, true, false);
+        }
+
+        function disconnectSheets() {
+            sheetsConfig = { sheetUrl: '', scriptUrl: '' };
+            localStorage.removeItem(CONFIG_KEY);
+            document.getElementById('sheet-url-input').value = '';
+            document.getElementById('script-url-input').value = '';
+            updateSyncUI();
+            showToast('Desconectado do Google Sheets. Usando armazenamento local.', 'info');
+        }
+
+        function updateSyncUI() {
+            const badge = document.getElementById('sync-badge');
+            const dot = document.getElementById('sync-dot');
+            const label = document.getElementById('sync-label');
+            const btnSyncNow = document.getElementById('btn-sync-now');
+            const pill = document.getElementById('sheets-connection-pill');
+            const manualBox = document.getElementById('manual-sync-box');
+            const driveLink = document.getElementById('open-drive-sheet-link');
+
+            if (sheetsConfig.scriptUrl) {
+                badge.className = "flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-medium bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20 hover:bg-emerald-500/20 transition-colors";
+                dot.className = "w-2 h-2 rounded-full bg-emerald-500";
+                label.textContent = "Google Sheets Ativo";
+                btnSyncNow.classList.remove('hidden');
+
+                pill.className = "px-3.5 py-2 rounded-xl text-xs font-semibold bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20 self-start";
+                pill.textContent = "Status: Conectado ao Google Planilhas";
+                manualBox.classList.remove('hidden');
+
+                if (sheetsConfig.sheetUrl) {
+                    driveLink.href = sheetsConfig.sheetUrl;
+                    driveLink.classList.remove('hidden');
+                } else {
+                    driveLink.classList.add('hidden');
+                }
+            } else {
+                badge.className = "flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-medium bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/20 hover:bg-amber-500/20 transition-colors";
+                dot.className = "w-2 h-2 rounded-full bg-amber-500 animate-pulse";
+                label.textContent = "Modo Local";
+                btnSyncNow.classList.add('hidden');
+
+                pill.className = "px-3.5 py-2 rounded-xl text-xs font-semibold bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/20 self-start";
+                pill.textContent = "Status: Não Conectado (Salvando no Navegador)";
+                manualBox.classList.add('hidden');
+            }
+        }
+
+        async function syncWithGoogleSheets(mode = 'push', silent = false, pushIfSheetEmpty = false, isInitialLoad = false) {
+            if (!sheetsConfig.scriptUrl) return;
+
+            const syncIcon = document.getElementById('sync-icon');
+            if (syncIcon) syncIcon.classList.add('animate-spin');
+
+            try {
+                if (mode === 'push') {
+                    const response = await fetch(sheetsConfig.scriptUrl, {
+                        method: 'POST',
+                        redirect: 'follow',
+                        headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+                        body: JSON.stringify({
+                            action: 'syncAll',
+                            transactions: transactions
+                        })
+                    });
+                    const result = await response.json();
+                    if (result.status === 'success') {
+                        saveLocalTransactions();
+                        if (!silent) showToast(`Planilha atualizada! (${result.count} registros sincronizados)`, 'success');
+                    } else {
+                        throw new Error(result.message || 'Resposta inesperada do Apps Script');
+                    }
+                } else if (mode === 'pull') {
+                    const sep = sheetsConfig.scriptUrl.includes('?') ? '&' : '?';
+                    const response = await fetch(`${sheetsConfig.scriptUrl}${sep}t=${Date.now()}`, {
+                        method: 'GET',
+                        redirect: 'follow',
+                        cache: 'no-store'
+                    });
+                    const result = await response.json();
+                    if (result.status === 'success' && Array.isArray(result.transactions)) {
+                        if (result.transactions.length > 0) {
+                            transactions = result.transactions.map((t, idx) => ({
+                                id: String(t.id || ('tx-' + Date.now() + '-' + idx)),
+                                date: String(t.date || '').substring(0, 10),
+                                description: String(t.description || ''),
+                                amount: Number(t.amount) || 0,
+                                type: t.type === 'Entrada' ? 'Entrada' : 'Saída',
+                                debtCategory: t.debtCategory || (t.type === 'Entrada' ? 'Receita' : 'Outra Dívida'),
+                                category: String(t.category || 'Outros'),
+                                status: t.status === 'Pendente' ? 'Pendente' : 'Pago',
+                                recurring: t.recurring === true || t.recurring === 'Sim'
+                            }));
+                            saveLocalTransactions();
+                            populateYearFilter();
+
+                            if (getPeriodFilteredTransactions().length === 0) {
+                                document.getElementById('filter-month').value = 'ALL';
+                                document.getElementById('filter-year').value = 'ALL';
+                            }
+
+                            renderAll();
+                            if (!silent) showToast(`${transactions.length} lançamentos carregados da Planilha Google!`, 'success');
+                        } else if (pushIfSheetEmpty && transactions.length > 0) {
+                            await syncWithGoogleSheets('push', false, false, false);
+                        } else if (!isInitialLoad) {
+                            transactions = [];
+                            saveLocalTransactions();
+                            populateYearFilter();
+                            renderAll();
+                            if (!silent) showToast('A planilha está vazia no momento.', 'info');
+                        }
+                    } else {
+                        throw new Error(result.message || 'Formato inválido retornado pela planilha');
+                    }
+                }
+            } catch (err) {
+                console.error('Erro na sincronização:', err);
+                if (!silent) {
+                    showToast('Erro ao conectar com Google Sheets. Verifique se implantou como "Qualquer pessoa".', 'error');
+                }
+            } finally {
+                if (syncIcon) syncIcon.classList.remove('animate-spin');
+            }
+        }
+
+        function copyAppsScript() {
+            const codeText = document.getElementById('apps-script-code').textContent;
+            const textarea = document.createElement('textarea');
+            textarea.value = codeText;
+            document.body.appendChild(textarea);
+            textarea.select();
+            try {
+                document.execCommand('copy');
+                showToast('Código Apps Script copiado! Cole em Extensões > Apps Script na sua planilha.', 'success');
+            } catch (e) {
+                showToast('Não foi possível copiar automaticamente. Selecione e copie manualmente.', 'error');
+            }
+            document.body.removeChild(textarea);
+        }
+
+        // =========================================================================
+        // EXPORTAR E IMPORTAR CSV / JSON
+        // =========================================================================
+        function exportCSV() {
+            const headers = ['ID', 'Data', 'Descricao', 'Valor', 'Tipo', 'Classificacao_Divida', 'Categoria', 'Status', 'Recorrente'];
+            const rows = transactions.map(t => [
+                t.id,
+                t.date,
+                `"${String(t.description).replace(/"/g, '""')}"`,
+                Number(t.amount).toFixed(2),
+                t.type,
+                t.debtCategory,
+                `"${String(t.category).replace(/"/g, '""')}"`,
+                t.status,
+                t.recurring ? 'Sim' : 'Não'
+            ]);
+
+            const csvContent = '\uFEFF' + [headers.join(';'), ...rows.map(r => r.join(';'))].join('\n');
+            const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+            const url = URL.createObjectURL(blob);
+            const link = document.createElement('a');
+            link.href = url;
+            link.download = `controle_financeiro_${new Date().toISOString().split('T')[0]}.csv`;
+            link.click();
+            URL.revokeObjectURL(url);
+            showToast('Arquivo CSV exportado com sucesso!', 'success');
+        }
+
+        function importFile(event) {
+            const file = event.target.files[0];
+            if (!file) return;
+
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                const content = e.target.result;
+                try {
+                    if (file.name.endsWith('.json')) {
+                        const parsed = JSON.parse(content);
+                        if (Array.isArray(parsed)) {
+                            transactions = parsed;
+                        }
+                    } else {
+                        const lines = content.split(/\r?\n/).filter(l => l.trim());
+                        const sep = lines[0].includes(';') ? ';' : ',';
+                        const imported = [];
+                        for (let i = 1; i < lines.length; i++) {
+                            const cols = lines[i].split(sep).map(c => c.replace(/^"|"$/g, '').trim());
+                            if (cols.length >= 6) {
+                                imported.push({
+                                    id: cols[0] || 'tx-' + Date.now() + i,
+                                    date: cols[1],
+                                    description: cols[2],
+                                    amount: parseFloat(cols[3].replace(',', '.')) || 0,
+                                    type: cols[4] === 'Entrada' ? 'Entrada' : 'Saída',
+                                    debtCategory: cols[5] || 'Outra Dívida',
+                                    category: cols[6] || 'Outros',
+                                    status: cols[7] === 'Pendente' ? 'Pendente' : 'Pago',
+                                    recurring: cols[8] === 'Sim'
+                                });
+                            }
+                        }
+                        if (imported.length > 0) transactions = imported;
+                    }
+
+                    saveLocalTransactions();
+                    populateYearFilter();
+                    renderAll();
+                    showToast(`${transactions.length} registros importados com sucesso!`, 'success');
+                } catch (err) {
+                    showToast('Erro ao ler arquivo. Verifique o formato.', 'error');
+                }
+                event.target.value = '';
+            };
+            reader.readAsText(file, 'UTF-8');
+        }
+
+        // =========================================================================
+        // UTILITÁRIOS (TOASTS, CONFIRMAÇÃO E SEGURANÇA)
+        // =========================================================================
+        function showToast(message, type = 'info') {
+            const container = document.getElementById('toast-container');
+            const toast = document.createElement('div');
+
+            const colors = {
+                success: 'bg-emerald-600 text-white border-emerald-500',
+                error: 'bg-rose-600 text-white border-rose-500',
+                info: 'bg-slate-800 text-white border-slate-700'
+            };
+
+            toast.className = `pointer-events-auto px-4 py-3 rounded-xl border shadow-lg text-xs font-medium flex items-center gap-2.5 transition-all duration-300 transform translate-y-2 opacity-0 ${colors[type] || colors.info}`;
+            toast.innerHTML = `<span>${escapeHTML(message)}</span>`;
+            container.appendChild(toast);
+
+            requestAnimationFrame(() => {
+                toast.classList.remove('translate-y-2', 'opacity-0');
+            });
+
+            setTimeout(() => {
+                toast.classList.add('opacity-0', 'translate-y-2');
+                setTimeout(() => toast.remove(), 300);
+            }, 3500);
+        }
+
+        let confirmCallback = null;
+        function openConfirmModal(title, message, onConfirm) {
+            document.getElementById('confirm-title').textContent = title;
+            document.getElementById('confirm-message').textContent = message;
+            confirmCallback = onConfirm;
+            const modal = document.getElementById('confirm-modal');
+            modal.classList.remove('hidden');
+            modal.classList.add('flex');
+        }
+
+        function closeConfirmModal() {
+            const modal = document.getElementById('confirm-modal');
+            modal.classList.add('hidden');
+            modal.classList.remove('flex');
+            confirmCallback = null;
+        }
+
+        document.getElementById('confirm-yes-btn').addEventListener('click', () => {
+            if (confirmCallback) confirmCallback();
+            closeConfirmModal();
+        });
+
+        function escapeHTML(str) {
+            return String(str)
+                .replace(/&/g, '&amp;')
+                .replace(/</g, '&lt;')
+                .replace(/>/g, '&gt;')
+                .replace(/"/g, '&quot;');
+        }
+    </script>
+</body>
+</html>
